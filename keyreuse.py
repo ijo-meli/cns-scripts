@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 from dataclasses import dataclass
+from functools import reduce
 from typing import Iterable, Callable
 
 
@@ -55,8 +56,15 @@ def load_wordlist(
 
 @dataclass
 class WordTree:
-    word: str | None
+    word: str
     children: list[WordTree]
+
+    def preview(self, depth: int) -> list[str]:
+        if depth <= 1 or not self.children: return [self.word]
+        child_previews = map(lambda c: c.preview(depth - 1), self.children)
+        child_previews = reduce(lambda a, b: a + b, child_previews)
+        previews = map(lambda p: p[0] + p[1], itertools.product([self.word], child_previews))
+        return list(previews)
 
 
 def generate_word_tree(options: Options, wordlist: Iterable[str], delimiters: set[str]) -> WordTree | None:
@@ -83,7 +91,35 @@ def generate_word_tree(options: Options, wordlist: Iterable[str], delimiters: se
 
     results = _gwt(0)
     if not results: return None
-    return WordTree(children=results, word=None)
+    return WordTree(children=results, word="")
+
+
+def manual(tree: WordTree, preview_depth: int = 3):
+    stack = [tree]
+    while stack[-1].children:
+        # options
+        top = stack[-1]
+        for i in range(len(top.children)):
+            print(f"--- ({i}) ---")
+            previews = top.children[i].preview(preview_depth)
+            for preview in sorted(previews): print(preview)
+            print("")  # newline
+        # current string
+        current = reduce(lambda a, b: a + b, map(lambda t: t.word, stack))
+        print(f"current=\"{current}\"")
+        # actions
+        try:
+            action = input("action=")
+            if action.startswith("back"):
+                if len(stack) > 1: stack.pop()
+            elif action.startswith("depth"):
+                preview_depth = int(action.split()[1])
+            else:
+                index = int(action)
+                stack.append(top.children[index])
+        except Exception:
+            print("invalid action")
+    print(reduce(lambda a, b: a + b, map(lambda t: t.word, stack)))
 
 
 alphabet = set(b"abcdefghijklmnopqrstuvwxyz ?,.")
@@ -110,5 +146,6 @@ da5 = DataAlpha(data=b"\x0f\x1d\x1cO\x13\x0b\n\b\x1f\x1d\x10\x1c[N\x1f\0\0\x1b\t
 
 opt = generate_options(da1, [da2, da3, da4])
 tree = generate_word_tree(opt, wordlist, {" ", ". ", ", ", "? "})
+manual(tree, 2)
 
 pass
